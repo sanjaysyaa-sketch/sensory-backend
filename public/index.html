@@ -177,7 +177,6 @@
     <div class="container">
         <h1>🧪 Sensory Data Processing Dashboard</h1>
         
-        <!-- File Upload Section -->
         <div class="upload-section">
             <h2>📤 Upload Sensory File</h2>
             <form id="uploadForm">
@@ -211,47 +210,22 @@
             <div id="uploadMessage"></div>
         </div>
 
-        <!-- Results Section -->
         <div class="results-section">
-            <h2>📊 Processing Results</h2>
+            <h2>📊 Sample Table Results</h2>
             
-            <!-- Statistics -->
-            <div class="stats" id="statsContainer">
-                <div class="stat-card">
-                    <div class="stat-value">0</div>
-                    <div class="stat-label">Total Samples</div>
+            <div class="stats" id="statsContainer" style="display: none;">
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value">0</div>
-                    <div class="stat-label">Total Consumers</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">0.00</div>
-                    <div class="stat-label">Average CMQ4</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">0%</div>
-                    <div class="stat-label">Data Quality</div>
-                </div>
-            </div>
             
-            <!-- Results Table -->
             <div id="resultsTableContainer">
                 <div class="loading" id="loadingResults">No data processed yet. Upload a file to see results.</div>
                 <table id="resultsTable" style="display: none;">
                     <thead>
                         <tr>
-                            <th>Sample ID</th>
-                            <th>Pick No</th>
+                            <th>Test Country</th>
+                            <th>Pick No.</th>
                             <th>EQS Ref</th>
-                            <th>Consumers</th>
-                            <th>Tender</th>
-                            <th>Juicy</th>
-                            <th>Flavor</th>
-                            <th>Overall</th>
-                            <th>CMQ4</th>
-                            <th>Quality</th>
-                            <th>Processed</th>
+                            <th>Average CMQ4</th>
+                            <th>UnClipped MQ4</th>
                         </tr>
                     </thead>
                     <tbody id="resultsTableBody">
@@ -261,229 +235,6 @@
         </div>
     </div>
 
-    <script>
-        // API base URL
-        const API_BASE_URL = 'http://localhost:3000/api';
-
-        class SensoryDashboard {
-            constructor() {
-                this.initializeEventListeners();
-                this.loadInitialData();
-            }
-
-            initializeEventListeners() {
-                const uploadForm = document.getElementById('uploadForm');
-                uploadForm.addEventListener('submit', (e) => this.handleFileUpload(e));
-            }
-
-            async loadInitialData() {
-                try {
-                    await this.loadSensoryResults();
-                } catch (error) {
-                    console.error('Error loading initial data:', error);
-                }
-            }
-
-            async handleFileUpload(event) {
-                event.preventDefault();
-                
-                const formData = new FormData();
-                const fileInput = document.getElementById('sensoryFile');
-                const pickNo = document.getElementById('pickNo').value;
-                const testCountry = document.getElementById('testCountry').value;
-                const uploadBtn = document.getElementById('uploadBtn');
-                const progressBar = document.getElementById('progressBar');
-                const progressFill = document.getElementById('progressFill');
-                const messageDiv = document.getElementById('uploadMessage');
-
-                if (!fileInput.files[0]) {
-                    this.showMessage('Please select a file to upload.', 'error');
-                    return;
-                }
-
-                formData.append('sensoryFile', fileInput.files[0]);
-                formData.append('pickNo', pickNo);
-                formData.append('testCountry', testCountry);
-
-                try {
-                    uploadBtn.disabled = true;
-                    uploadBtn.textContent = 'Processing...';
-                    progressBar.style.display = 'block';
-                    messageDiv.innerHTML = '';
-
-                    this.simulateProgress(progressFill);
-
-                    const response = await fetch(`${API_BASE_URL}/upload`, {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    const result = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(result.message || 'Upload failed');
-                    }
-
-                    if (result.success) {
-                        this.showMessage(`✅ ${result.message}`, 'success');
-                        console.log('Processing result:', result);
-                        
-                        await this.loadSensoryResults();
-                        this.updateStats(result.data.summary);
-                        
-                    } else {
-                        throw new Error(result.message || 'Processing failed');
-                    }
-
-                } catch (error) {
-                    console.error('Upload error:', error);
-                    this.showMessage(`❌ Error: ${error.message}`, 'error');
-                } finally {
-                    uploadBtn.disabled = false;
-                    uploadBtn.textContent = 'Process File';
-                    progressBar.style.display = 'none';
-                    progressFill.style.width = '0%';
-                }
-            }
-
-            simulateProgress(progressFill) {
-                let width = 0;
-                const interval = setInterval(() => {
-                    if (width >= 90) {
-                        clearInterval(interval);
-                    } else {
-                        width += Math.random() * 10;
-                        progressFill.style.width = Math.min(width, 90) + '%';
-                    }
-                }, 200);
-            }
-
-            async loadSensoryResults() {
-                try {
-                    const response = await fetch(`${API_BASE_URL}/sensory/dashboard/table`);
-                    
-                    if (!response.ok) {
-                        throw new Error('Failed to load results');
-                    }
-
-                    const result = await response.json();
-
-                    if (result.success && result.data.length > 0) {
-                        this.displayResultsTable(result.data);
-                        this.updateStats(this.calculateStats(result.data));
-                    } else {
-                        this.showNoDataMessage();
-                    }
-
-                } catch (error) {
-                    console.error('Error loading results:', error);
-                    this.showNoDataMessage();
-                }
-            }
-
-            displayResultsTable(data) {
-                const table = document.getElementById('resultsTable');
-                const tableBody = document.getElementById('resultsTableBody');
-                const loadingDiv = document.getElementById('loadingResults');
-
-                loadingDiv.style.display = 'none';
-                table.style.display = 'table';
-                tableBody.innerHTML = '';
-
-                data.forEach(item => {
-                    const row = document.createElement('tr');
-                    
-                    row.innerHTML = `
-                        <td>${item.id}</td>
-                        <td>${item.pickNo}</td>
-                        <td>${item.eqsRef}</td>
-                        <td>${item.consumers}</td>
-                        <td>${item.tender.toFixed(2)}</td>
-                        <td>${item.juicy.toFixed(2)}</td>
-                        <td>${item.flavor.toFixed(2)}</td>
-                        <td>${item.overall.toFixed(2)}</td>
-                        <td><strong>${item.cmq4.toFixed(2)}</strong></td>
-                        <td>
-                            <span style="color: ${
-                                item.quality >= 95 ? '#28a745' : 
-                                item.quality >= 90 ? '#ffc107' : 
-                                item.quality >= 80 ? '#fd7e14' : '#dc3545'
-                            }">
-                                ${item.quality}%
-                            </span>
-                        </td>
-                        <td>${new Date(item.processedAt).toLocaleDateString()}</td>
-                    `;
-                    
-                    tableBody.appendChild(row);
-                });
-            }
-
-            updateStats(summary) {
-                const statsContainer = document.getElementById('statsContainer');
-                
-                statsContainer.innerHTML = `
-                    <div class="stat-card">
-                        <div class="stat-value">${summary.totalSamples}</div>
-                        <div class="stat-label">Total Samples</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${summary.totalConsumers}</div>
-                        <div class="stat-label">Total Consumers</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${summary.averageCMQ4.toFixed(2)}</div>
-                        <div class="stat-label">Average CMQ4</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${summary.averageQuality}%</div>
-                        <div class="stat-label">Data Quality</div>
-                    </div>
-                `;
-            }
-
-            calculateStats(data) {
-                if (!data || data.length === 0) {
-                    return {
-                        totalSamples: 0,
-                        totalConsumers: 0,
-                        averageCMQ4: 0,
-                        averageQuality: 0
-                    };
-                }
-
-                return {
-                    totalSamples: data.length,
-                    totalConsumers: data.reduce((sum, item) => sum + item.consumers, 0),
-                    averageCMQ4: data.reduce((sum, item) => sum + item.cmq4, 0) / data.length,
-                    averageQuality: data.reduce((sum, item) => sum + item.quality, 0) / data.length
-                };
-            }
-
-            showNoDataMessage() {
-                const loadingDiv = document.getElementById('loadingResults');
-                const table = document.getElementById('resultsTable');
-                
-                table.style.display = 'none';
-                loadingDiv.style.display = 'block';
-                loadingDiv.textContent = 'No data available. Upload a sensory file to see results.';
-            }
-
-            showMessage(message, type) {
-                const messageDiv = document.getElementById('uploadMessage');
-                messageDiv.innerHTML = `<div class="${type}">${message}</div>`;
-                
-                if (type === 'success') {
-                    setTimeout(() => {
-                        messageDiv.innerHTML = '';
-                    }, 5000);
-                }
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            new SensoryDashboard();
-        });
-    </script>
+    <script src="/script.js"></script> 
 </body>
 </html>

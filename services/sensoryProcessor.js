@@ -1,138 +1,139 @@
-const { processSensoryFile, getAllResults, getSampleResults: getSampleResultsService, getDashboardTableData } = require('../services/sensoryProcessor');
-const { calculateStats } = require('../utils/helpers');
+// services/sensoryProcessor.js
+
+const { parseFile } = require('./fileParser');
+const { processSampleGroup, calculateQualityMetrics } = require('./calculations');
+const { generateSampleId, formatTableData, calculateStats } = require('../utils/helpers');
+const fs = require('fs');
 const path = require('path');
 
+// In-memory Data Store
+const sensoryDataStore = new Map(); 
+let dashboardTableData = []; 
+let globalSummary = calculateStats([]);
+
 /**
- * Get all sensory results (paginated + filtered)
+ * Core function to process an uploaded file, calculate metrics, and store results.
  */
-const getAllSensoryResults = async (req, res, next) => {
-  try {
-    const { page = 1, limit = 50, pickNo, testCountry } = req.query;
+const processSensoryFile = async (filePath, pickNo, testCountry) => {
+    const groupedScores = await parseFile(filePath);
+
+    const processedSamples = [];
+    for (const eqsRef in groupedScores) {
+        try {
+            const sampleGroup = groupedScores[eqsRef];
+            
+            const result = processSampleGroup(sampleGroup);
+            const qualityMetrics = calculateQualityMetrics(result);
+
+            const sampleId = generateSampleId(pickNo, eqsRef);
+            const finalSample = {
+                ...result,
+                sampleId,
+                pickNo,
+                testCountry,
+                qualityMetrics,
+                processedAt: new Date().toISOString()
+            };
+
+            processedSamples.push(finalSample);
+            sensoryDataStore.set(sampleId, finalSample);
+
+        } catch (error) {
+            console.error(`Skipping sample ${eqsRef} due to processing error: ${error.message}`);
+        }
+    }
     
-    const results = getAllResults({
-      page: parseInt(page),
-      limit: parseInt(limit),
-      pickNo,
-      testCountry
+    fs.unlink(filePath, (err) => {
+        if (err) console.error(`Failed to delete file ${filePath}:`, err);
     });
 
-    res.status(200).json({
-      success: true,
-      data: results,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: results.length
-      }
-    });
+    updateGlobalData();
 
-  } catch (error) {
-    next(error);
-  }
+    return { 
+        processedSamplesCount: processedSamples.length, 
+        summary: globalSummary,
+        processedSamples
+    };
+};
+
+// Helper to update the derived data stores after a successful processing batch
+const updateGlobalData = () => {
+    const allResults = Array.from(sensoryDataStore.values()); 
+    
+    // Calculate Unique Consumer Count
+    const uniqueConsumerIds = new Set();
+    allResults.forEach(sample => {
+        if (sample.rawScores) {
+            sample.rawScores.forEach(score => {
+                if (score.consumerNo) { 
+                    // Use a composite key if necessary, but ConsumerNo is sufficient if unique per file
+                    uniqueConsumerIds.add(score.consumerNo);
+                }
+            });
+        }
+    });
+    const uniqueConsumerCount = uniqueConsumerIds.size;
+    
+    // Recalculate Dashboard Table Data
+    dashboardTableData = formatTableData(allResults);
+    
+    // Recalculate Global Statistics, passing the unique count
+    globalSummary = calculateStats(allResults, uniqueConsumerCount);
+};
+
+
+/**
+ * Public function to retrieve a specific sample result.
+ */
+const getSampleResults = (sampleId) => {
+    return sensoryDataStore.get(sampleId);
 };
 
 /**
- * Get sample-specific sensory results
+ * Public function to retrieve all stored data, filtered and paginated.
  */
-const getSampleResultsController = async (req, res, next) => {
-  try {
-    const { sampleId } = req.params;
+const getAllResults = (options = {}) => {
+    let results = Array.from(sensoryDataStore.values());
     
-    const result = getSampleResultsService(sampleId);
+    if (options.pickNo) {
+        results = results.filter(r => r.pickNo === options.pickNo);
+    }
+    if (options.testCountry) {
+        results = results.filter(r => r.testCountry === options.testCountry);
+    }
     
-    if (!result) {
-      return res.status(404).json({
-        success: false,
-        message: 'Sample not found'
-      });
+    return results;
+};
+
+/**
+ * Public function to retrieve the data formatted for the dashboard table.
+ */
+const getDashboardTableData = (options = {}) => {
+    let data = [...dashboardTableData]; 
+
+    if (options.pickNo) {
+        data = data.filter(r => r.pickNo === options.pickNo);
+    }
+    if (options.testCountry) {
+        data = data.filter(r => r.testCountry === options.testCountry);
     }
 
-    res.status(200).json({
-      success: true,
-      data: result
-    });
-
-  } catch (error) {
-    next(error);
-  }
+    return data;
 };
 
 /**
- * Get dashboard statistics
+ * Public function to retrieve the latest global statistics.
  */
-const getDashboardStats = async (req, res, next) => {
-  try {
-    const results = getAllResults();
-    const stats = calculateStats(results);
-
-    res.status(200).json({
-      success: true,
-      data: stats
-    });
-
-  } catch (error) {
-    next(error);
-  }
+const getGlobalSummaryStats = () => {
+    return globalSummary;
 };
 
-/**
- * Get dashboard table data
- */
-const getDashboardTable = async (req, res, next) => {
-  try {
-    const tableData = getDashboardTableData(req.query);
-    
-    res.json({
-      success: true,
-      data: tableData,
-      total: tableData.length
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Process uploaded sensory Excel file and return processed results
- */
-const processUploadedFile = async (req, res, next) => {
-  try {
-    const { sensoryFile, pickNo, testCountry } = req.query;
-
-    if (!sensoryFile) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing sensoryFile query parameter.'
-      });
-    }
-
-    const uploadsDir = path.join(__dirname, '..', 'public', 'uploads');
-    const filename = path.basename(decodeURIComponent(sensoryFile));
-    const filePath = path.join(uploadsDir, filename);
-
-    // Process the file using existing service
-    const { processedSamples, summary } = await processSensoryFile(filePath, pickNo, testCountry);
-
-    return res.status(200).json({
-      success: true,
-      file: filename,
-      pickNo,
-      testCountry,
-      sheets: processedSamples.length, // number of samples processed
-      summary,
-      data: processedSamples
-    });
-
-  } catch (error) {
-    console.error('processUploadedFile error:', error);
-    next(error);
-  }
-};
 
 module.exports = {
-  getAllSensoryResults,
-  getSampleResults: getSampleResultsController,
-  getDashboardStats,
-  getDashboardTable,
-  processUploadedFile
+    processSensoryFile,
+    getAllResults,
+    getSampleResults,
+    getDashboardTableData,
+    getGlobalSummaryStats,
+    sensoryDataStore
 };
