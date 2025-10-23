@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sensory Data Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .upload-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            border: 2px dashed #ddd;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+            display: none;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #28a745;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .results-section {
+            margin-top: 30px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .success {
+            background: #d1edff;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Sensory Data Processing Dashboard</h1>
+        
+        <!-- File Upload Section -->
+        <div class="upload-section">
+            <h2>📤 Upload Sensory File</h2>
+            <form id="uploadForm">
+                <div class="form-group">
+                    <label for="sensoryFile">Select File (Excel, CSV, JSON):</label>
+                    <input type="file" id="sensoryFile" name="sensoryFile" accept=".xlsx,.xls,.csv,.json" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="pickNo">Pick Number:</label>
+                    <input type="text" id="pickNo" name="pickNo" value="2284" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="testCountry">Test Country:</label>
+                    <select id="testCountry" name="testCountry" required>
+                        <option value="AUS">Australia (AUS)</option>
+                        <option value="USA">United States (USA)</option>
+                        <option value="UK">United Kingdom (UK)</option>
+                        <option value="NZ">New Zealand (NZ)</option>
+                    </select>
+                </div>
+                
+                <button type="submit" id="uploadBtn">Process File</button>
+            </form>
+            
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            
+            <div id="uploadMessage"></div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-section">
+            <h2>📊 Processing Results</h2>
+            
+            <!-- Statistics -->
+            <div class="stats" id="statsContainer">
+                <div class="stat-card">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">Total Samples</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">0</div>
+                    <div class="stat-label">Total Consumers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">0.00</div>
+                    <div class="stat-label">Average CMQ4</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">0%</div>
+                    <div class="stat-label">Data Quality</div>
+                </div>
+            </div>
+            
+            <!-- Results Table -->
+            <div id="resultsTableContainer">
+                <div class="loading" id="loadingResults">No data processed yet. Upload a file to see results.</div>
+                <table id="resultsTable" style="display: none;">
+                    <thead>
+                        <tr>
+                            <th>Sample ID</th>
+                            <th>Pick No</th>
+                            <th>EQS Ref</th>
+                            <th>Consumers</th>
+                            <th>Tender</th>
+                            <th>Juicy</th>
+                            <th>Flavor</th>
+                            <th>Overall</th>
+                            <th>CMQ4</th>
+                            <th>Quality</th>
+                            <th>Processed</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API base URL
+        const API_BASE_URL = 'http://localhost:3000/api';
+
+        class SensoryDashboard {
+            constructor() {
+                this.initializeEventListeners();
+                this.loadInitialData();
+            }
+
+            initializeEventListeners() {
+                const uploadForm = document.getElementById('uploadForm');
+                uploadForm.addEventListener('submit', (e) => this.handleFileUpload(e));
+            }
+
+            async loadInitialData() {
+                try {
+                    await this.loadSensoryResults();
+                } catch (error) {
+                    console.error('Error loading initial data:', error);
+                }
+            }
+
+            async handleFileUpload(event) {
+                event.preventDefault();
+                
+                const formData = new FormData();
+                const fileInput = document.getElementById('sensoryFile');
+                const pickNo = document.getElementById('pickNo').value;
+                const testCountry = document.getElementById('testCountry').value;
+                const uploadBtn = document.getElementById('uploadBtn');
+                const progressBar = document.getElementById('progressBar');
+                const progressFill = document.getElementById('progressFill');
+                const messageDiv = document.getElementById('uploadMessage');
+
+                if (!fileInput.files[0]) {
+                    this.showMessage('Please select a file to upload.', 'error');
+                    return;
+                }
+
+                formData.append('sensoryFile', fileInput.files[0]);
+                formData.append('pickNo', pickNo);
+                formData.append('testCountry', testCountry);
+
+                try {
+                    uploadBtn.disabled = true;
+                    uploadBtn.textContent = 'Processing...';
+                    progressBar.style.display = 'block';
+                    messageDiv.innerHTML = '';
+
+                    this.simulateProgress(progressFill);
+
+                    const response = await fetch(`${API_BASE_URL}/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(result.message || 'Upload failed');
+                    }
+
+                    if (result.success) {
+                        this.showMessage(`✅ ${result.message}`, 'success');
+                        console.log('Processing result:', result);
+                        
+                        await this.loadSensoryResults();
+                        this.updateStats(result.data.summary);
+                        
+                    } else {
+                        throw new Error(result.message || 'Processing failed');
+                    }
+
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    this.showMessage(`❌ Error: ${error.message}`, 'error');
+                } finally {
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = 'Process File';
+                    progressBar.style.display = 'none';
+                    progressFill.style.width = '0%';
+                }
+            }
+
+            simulateProgress(progressFill) {
+                let width = 0;
+                const interval = setInterval(() => {
+                    if (width >= 90) {
+                        clearInterval(interval);
+                    } else {
+                        width += Math.random() * 10;
+                        progressFill.style.width = Math.min(width, 90) + '%';
+                    }
+                }, 200);
+            }
+
+            async loadSensoryResults() {
+                try {
+                    const response = await fetch(`${API_BASE_URL}/sensory/dashboard/table`);
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to load results');
+                    }
+
+                    const result = await response.json();
+
+                    if (result.success && result.data.length > 0) {
+                        this.displayResultsTable(result.data);
+                        this.updateStats(this.calculateStats(result.data));
+                    } else {
+                        this.showNoDataMessage();
+                    }
+
+                } catch (error) {
+                    console.error('Error loading results:', error);
+                    this.showNoDataMessage();
+                }
+            }
+
+            displayResultsTable(data) {
+                const table = document.getElementById('resultsTable');
+                const tableBody = document.getElementById('resultsTableBody');
+                const loadingDiv = document.getElementById('loadingResults');
+
+                loadingDiv.style.display = 'none';
+                table.style.display = 'table';
+                tableBody.innerHTML = '';
+
+                data.forEach(item => {
+                    const row = document.createElement('tr');
+                    
+                    row.innerHTML = `
+                        <td>${item.id}</td>
+                        <td>${item.pickNo}</td>
+                        <td>${item.eqsRef}</td>
+                        <td>${item.consumers}</td>
+                        <td>${item.tender.toFixed(2)}</td>
+                        <td>${item.juicy.toFixed(2)}</td>
+                        <td>${item.flavor.toFixed(2)}</td>
+                        <td>${item.overall.toFixed(2)}</td>
+                        <td><strong>${item.cmq4.toFixed(2)}</strong></td>
+                        <td>
+                            <span style="color: ${
+                                item.quality >= 95 ? '#28a745' : 
+                                item.quality >= 90 ? '#ffc107' : 
+                                item.quality >= 80 ? '#fd7e14' : '#dc3545'
+                            }">
+                                ${item.quality}%
+                            </span>
+                        </td>
+                        <td>${new Date(item.processedAt).toLocaleDateString()}</td>
+                    `;
+                    
+                    tableBody.appendChild(row);
+                });
+            }
+
+            updateStats(summary) {
+                const statsContainer = document.getElementById('statsContainer');
+                
+                statsContainer.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">${summary.totalSamples}</div>
+                        <div class="stat-label">Total Samples</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${summary.totalConsumers}</div>
+                        <div class="stat-label">Total Consumers</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${summary.averageCMQ4.toFixed(2)}</div>
+                        <div class="stat-label">Average CMQ4</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${summary.averageQuality}%</div>
+                        <div class="stat-label">Data Quality</div>
+                    </div>
+                `;
+            }
+
+            calculateStats(data) {
+                if (!data || data.length === 0) {
+                    return {
+                        totalSamples: 0,
+                        totalConsumers: 0,
+                        averageCMQ4: 0,
+                        averageQuality: 0
+                    };
+                }
+
+                return {
+                    totalSamples: data.length,
+                    totalConsumers: data.reduce((sum, item) => sum + item.consumers, 0),
+                    averageCMQ4: data.reduce((sum, item) => sum + item.cmq4, 0) / data.length,
+                    averageQuality: data.reduce((sum, item) => sum + item.quality, 0) / data.length
+                };
+            }
+
+            showNoDataMessage() {
+                const loadingDiv = document.getElementById('loadingResults');
+                const table = document.getElementById('resultsTable');
+                
+                table.style.display = 'none';
+                loadingDiv.style.display = 'block';
+                loadingDiv.textContent = 'No data available. Upload a sensory file to see results.';
+            }
+
+            showMessage(message, type) {
+                const messageDiv = document.getElementById('uploadMessage');
+                messageDiv.innerHTML = `<div class="${type}">${message}</div>`;
+                
+                if (type === 'success') {
+                    setTimeout(() => {
+                        messageDiv.innerHTML = '';
+                    }, 5000);
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new SensoryDashboard();
+        });
+    </script>
+</body>
+</html>
